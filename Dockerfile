@@ -1,19 +1,24 @@
 FROM alpine:3.15.0 AS build
-# crypto++-dev is in edge/testing
-RUN apk add --no-cache --repository http://dl-cdn.alpinelinux.org/alpine/edge/testing/ \
+RUN apk add --no-cache \
   binutils \
   boost-dev \
   build-base \
   clang \
   cmake \
-  crypto++-dev \
   fmt-dev \
   gcc \
+  git \
   gmp-dev \
   luajit-dev \
   make \
   mariadb-connector-c-dev \
   pugixml-dev
+
+RUN git clone --depth 1 --branch CRYPTOPP_8_4_0 https://github.com/weidai11/cryptopp.git /usr/src/cryptopp
+WORKDIR /usr/src/cryptopp
+RUN make
+# Installs to /usr/local/include/cryptopp/*.h /usr/local/lib/libcryptopp.a /usr/local/bin/cryptest.exe /usr/local/share/cryptopp/TestData/*.dat /usr/local/share/cryptopp/TestVectors/*.txt
+RUN make install
 
 COPY cmake /usr/src/forgottenserver/cmake/
 COPY src /usr/src/forgottenserver/src/
@@ -22,17 +27,22 @@ WORKDIR /usr/src/forgottenserver/build
 RUN cmake .. && make
 
 FROM alpine:3.15.0
-# crypto++ is in edge/testing
-RUN apk add --no-cache --repository http://dl-cdn.alpinelinux.org/alpine/edge/testing/ \
+RUN apk add --no-cache \
   boost-iostreams \
   boost-system \
   boost-filesystem \
-  crypto++ \
   fmt \
   gmp \
   luajit \
   mariadb-connector-c \
   pugixml
+
+# Install crypto++ installation outputs
+COPY --from=build /usr/local/include/cryptopp /usr/local/include/cryptopp
+COPY --from=build /usr/local/lib/libcryptopp.a /usr/local/lib/libcryptopp.a
+COPY --from=build /usr/local/bin/cryptest.exe /usr/local/bin/cryptest.exe
+COPY --from=build /usr/local/share/cryptopp/TestData /usr/local/share/cryptopp/TestData
+COPY --from=build /usr/local/share/cryptopp/TestVectors /usr/local/share/cryptopp/TestVectors
 
 COPY --from=build /usr/src/forgottenserver/build/tfs /bin/tfs
 COPY data /srv/data/
